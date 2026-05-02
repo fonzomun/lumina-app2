@@ -18,7 +18,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND_URL = 'http://127.0.0.1:8001';
 
 // Official Lumina logo (white version for dark backgrounds)
 const LUMINA_LOGO_SMALL_WHITE = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/n1098pix_Lumina-app_small-logo-white.png';
@@ -97,13 +97,10 @@ export default function CategoryDetailScreen() {
       const token = await AsyncStorage.getItem('access_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const [catResponse, affResponse] = await Promise.all([
-        axios.get(`${BACKEND_URL}/api/categories/${id}`, { headers }),
-        axios.get(`${BACKEND_URL}/api/categories/${id}/affirmations`, { headers }),
-      ]);
+      const response = await axios.get(`${BACKEND_URL}/api/categories/${id}`, { headers });
 
-      setCategory(catResponse.data);
-      setAffirmations(affResponse.data);
+      setCategory(response.data);
+      setAffirmations(response.data.affirmations);
     } catch (error) {
       console.error('Error fetching category:', error);
     } finally {
@@ -200,7 +197,7 @@ export default function CategoryDetailScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => router.push('/(tabs)/home')}
           >
             <Image
               source={{ uri: LUMINA_LOGO_SMALL_WHITE }}

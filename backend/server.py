@@ -103,7 +103,7 @@ app = FastAPI(title="Lumina - Audio Affirmations API", lifespan=lifespan)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8081"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -166,8 +166,6 @@ async def seed_data():
     
     # Check if categories exist
     existing_categories = await db.categories.count_documents({})
-    if existing_categories > 0:
-        return
     
     # Seed categories
     categories = [
@@ -226,8 +224,10 @@ async def seed_data():
             "created_at": datetime.now(timezone.utc)
         }
     ]
-    
-    await db.categories.insert_many(categories)
+    if await db.categories.count_documents({}) == 0:
+        await db.categories.insert_many(categories)
+
+    print("CATEGORIAS INSERTADAS:", len(categories))
     
     # Seed affirmations for each category
     affirmations_data = {
@@ -297,6 +297,7 @@ async def seed_data():
                 "created_at": datetime.now(timezone.utc)
             })
     
+    await db.affirmations.delete_many({})
     await db.affirmations.insert_many(affirmations_to_insert)
     print("Seeded categories and affirmations successfully!")
 
@@ -496,8 +497,8 @@ async def get_categories(request: Request):
     categories = await db.categories.find({}, {"_id": 0}).sort("priority", 1).to_list(100)
     
     result = []
+
     for cat in categories:
-        # Count affirmations in this category
         count = await db.affirmations.count_documents({"category_id": cat["category_id"]})
         result.append({
             "id": cat["category_id"],
@@ -508,25 +509,27 @@ async def get_categories(request: Request):
             "icon": cat.get("icon"),
             "affirmation_count": count
         })
-    
-    return result
+
+    return result 
 
 @app.get("/api/categories/{category_id}")
 async def get_category(category_id: str):
-    category = await db.categories.find_one({"category_id": category_id}, {"_id": 0})
+    category = await db.categories.find_one(
+        {"category_id": category_id},
+        {"_id": 0}
+    )
+
     if not category:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
-    
-    count = await db.affirmations.count_documents({"category_id": category_id})
-    
+
+    affirmations = await db.affirmations.find(
+        {"category_id": category_id},
+        {"_id": 0}
+    ).to_list(100)
+
     return {
-        "id": category["category_id"],
-        "name": category["name"],
-        "description": category["description"],
-        "image_url": category.get("image_url"),
-        "priority": category["priority"],
-        "icon": category.get("icon"),
-        "affirmation_count": count
+        **category,
+        "affirmations": affirmations
     }
 
 @app.get("/api/categories/{category_id}/affirmations")
@@ -558,7 +561,9 @@ async def get_category_affirmations(category_id: str, request: Request):
             "category_id": aff["category_id"],
             "duration": aff["duration"],
             "order": aff.get("order", 1),
-            "is_favorite": is_favorite
+            "is_favorite": is_favorite,
+            "audio_url": aff.get("audio_url")
+            
         })
     
     return result

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-const BACKEND_URL = "http://localhost:8001";
+const BACKEND_URL = "http://127.0.0.1:8001";
 
 interface User {
   user_id: string;
