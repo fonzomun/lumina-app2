@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -17,10 +18,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  getMeditationStreak
+} from '@/lib/streaks';
 
-const BACKEND_URL = "http://127.0.0.1:8001";
+const BACKEND_URL = "http://192.168.1.78:8001";
 const { width } = Dimensions.get('window');
 
 // Official Lumina logo
@@ -57,12 +61,38 @@ interface Category {
   affirmation_count: number;
 }
 
+const avatars = [
+  require('@/assets/images/avatars/lumina-avatar-air-monk.png'),
+  require('@/assets/images/avatars/lumina-avatar-alien.png'),
+  require('@/assets/images/avatars/lumina-avatar-deer.png'),
+  require('@/assets/images/avatars/lumina-avatar-fire-spirit.png'),
+  require('@/assets/images/avatars/lumina-avatar-forest-spirit.png'),
+  require('@/assets/images/avatars/lumina-avatar-lion.png'),
+  require('@/assets/images/avatars/lumina-avatar-mystic-hood.png'),
+  require('@/assets/images/avatars/lumina-avatar-owl.png'),
+  require('@/assets/images/avatars/lumina-avatar-shadow-panther.png'),
+  require('@/assets/images/avatars/lumina-avatar-water-spirit.png'),
+  require('@/assets/images/avatars/lumina-avatar-wind-sage.png'),
+  require('@/assets/images/avatars/lumina-avatar-fox.png'),
+];
+
 export default function HomeScreen() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] =
+    useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
+  const [displayName, setDisplayName] = useState('');
+
+  const [streak, setStreak] =
+    useState(0);
+
+  const [profilePhoto, setProfilePhoto] =
+    useState<string | null>(null);
+
+  const [selectedAvatar, setSelectedAvatar] =
+    useState<number | null>(null);
 
   const fetchCategories = async () => {
     try {
@@ -70,18 +100,86 @@ export default function HomeScreen() {
       const response = await axios.get(`${BACKEND_URL}/api/categories`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+
+      console.log(response.data);
+
       setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
-    } finally {
+    }
+    finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  const loadStreak = async () => {
+
+    const value =
+      await getMeditationStreak();
+
+    setStreak(value);
+
+  };
+
   useEffect(() => {
+
     fetchCategories();
+
+    loadStreak();
+
   }, []);
+
+  useEffect(() => {
+
+    loadProfileData();
+
+  }, []);
+
+  const loadProfileData = async () => {
+
+    const { data: { session } } =
+      await supabase.auth.getSession();
+
+    if (!session?.user?.id) {
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profile?.display_name) {
+
+      setDisplayName(profile.display_name);
+
+    }
+
+    const savedPhoto =
+      await AsyncStorage.getItem(
+        'lumina_profile_photo'
+      );
+
+    const savedAvatar =
+      await AsyncStorage.getItem(
+        'lumina_avatar'
+      );
+
+    if (savedPhoto) {
+
+      setProfilePhoto(savedPhoto);
+
+    }
+
+    if (savedAvatar !== null) {
+
+      setSelectedAvatar(Number(savedAvatar));
+
+    }
+
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -127,7 +225,28 @@ export default function HomeScreen() {
   const mediumCategories = categories.filter(c => c.priority === 2);
   const smallCategories = categories.filter(c => c.priority === 3);
 
-  const firstName = user?.name?.split(' ')[0] || 'Usuario';
+  const streakMessages = [
+
+    'Tu energía crece con constancia.',
+
+    'Cada día de calma transforma tu mente.',
+
+    'Pequeños momentos crean grandes cambios.',
+
+    'Tu paz interior también se fortalece.',
+
+    'Volver a ti también es progreso.',
+
+  ];
+
+  const randomStreakMessage =
+
+    streakMessages[
+    streak % streakMessages.length
+    ];
+
+  const firstName =
+    displayName || 'Usuario';
 
   if (loading) {
     return (
@@ -145,6 +264,7 @@ export default function HomeScreen() {
       colors={['#FFFFFF', '#FFF8F5', '#FFF5F0', '#FFF0F5', '#F5F0FF']}
       style={styles.container}
     >
+
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -153,6 +273,30 @@ export default function HomeScreen() {
           }
           contentContainerStyle={styles.scrollContent}
         >
+          {streak > 0 && (
+
+            <View style={styles.streakCard}>
+
+              <Text style={styles.streakEmoji}>
+                🔥
+              </Text>
+
+              <View>
+
+                <Text style={styles.streakTitle}>
+                  {streak} días seguidos
+                </Text>
+
+                <Text style={styles.streakSubtitle}>
+                  {randomStreakMessage}
+                </Text>
+
+              </View>
+
+            </View>
+
+          )}
+
           {/* Header */}
           <View style={styles.header}>
             <Image
@@ -160,26 +304,47 @@ export default function HomeScreen() {
               style={styles.logoImage}
               resizeMode="contain"
             />
-            <TouchableOpacity style={styles.menuButton}>
-              <Ionicons name="ellipsis-vertical" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
+
           </View>
 
           {/* User Greeting */}
           <View style={styles.greetingContainer}>
             <View style={styles.avatarContainer}>
-              {user?.picture ? (
-                <Image source={{ uri: user.picture }} style={styles.avatar} />
+              {profilePhoto ? (
+
+                <Image
+                  source={{ uri: profilePhoto }}
+                  style={styles.avatar}
+                />
+
+              ) : selectedAvatar !== null ? (
+
+                <Image
+                  source={avatars[selectedAvatar]}
+                  style={styles.avatar}
+                />
+
+              ) : user?.picture ? (
+
+                <Image
+                  source={{ uri: user.picture }}
+                  style={styles.avatar}
+                />
+
               ) : (
+
                 <LinearGradient
                   colors={['#FF9A6C', '#FF6B8A']}
                   style={styles.avatarPlaceholder}
                 >
-                  <Text style={styles.avatarText}>{firstName[0]?.toUpperCase()}</Text>
+                  <Text style={styles.avatarText}>
+                    {firstName[0]?.toUpperCase()}
+                  </Text>
                 </LinearGradient>
+
               )}
             </View>
-            <Text style={styles.greeting}>Hola {firstName}</Text>
+            <Text style={styles.greeting}>Hola {displayName || firstName}</Text>
           </View>
 
           {/* Tagline Image */}
@@ -281,7 +446,7 @@ export default function HomeScreen() {
           </View>
 
           {/* Promotional Banner */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.promoBanner}
             onPress={handlePromoBannerPress}
             activeOpacity={0.9}
@@ -530,5 +695,31 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 160,
     borderRadius: 20,
+  },
+
+  streakCard: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+
+  streakEmoji: {
+    fontSize: 28,
+  },
+
+  streakTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E3A5F',
+  },
+
+  streakSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
 });

@@ -28,6 +28,13 @@ export default function TabsLayout() {
         },
       }}
     >
+
+      <Tabs.Screen
+        name="category/[id]"
+        options={{
+          href: null,
+        }}
+      />
       <Tabs.Screen
         name="home"
         options={{
@@ -42,7 +49,7 @@ export default function TabsLayout() {
         options={{
           title: 'Favoritos',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart" size={size} color={color} />
+            <Ionicons name="bookmark" size={size} color={color} />
           ),
         }}
       />
@@ -55,6 +62,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-    </Tabs>
+    </Tabs >
   );
 }

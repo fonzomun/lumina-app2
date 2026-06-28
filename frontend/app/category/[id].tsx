@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from '../../lib/supabase';
 import {
   View,
   Text,
@@ -16,9 +17,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
 
-const BACKEND_URL = 'http://127.0.0.1:8001';
+import Slider from '@react-native-community/slider';
+import {
+  markContentAsSeen
+} from '@/lib/content';
+import {
+  updateMeditationStreak
+} from '@/lib/streaks';
+
+import {
+  saveAudioProgress,
+  getAudioProgress
+} from '@/lib/audio-progress';
+
+const BACKEND_URL = 'http://192.168.1.78:8001';
 
 // Official Lumina logo (white version for dark backgrounds)
 const LUMINA_LOGO_SMALL_WHITE = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/n1098pix_Lumina-app_small-logo-white.png';
@@ -44,22 +58,58 @@ interface Category {
 }
 
 interface Affirmation {
-  id: string;
+  title?: string;
   text: string;
   category_id: string;
   duration: number;
   order: number;
   is_favorite: boolean;
+  audio_url?: string;
+  affirmation_id: string;
 }
 
+
 export default function CategoryDetailScreen() {
+  useEffect(() => {
+
+    const setupAudio = async () => {
+
+      await Audio.setAudioModeAsync({
+
+        staysActiveInBackground: true,
+
+        shouldDuckAndroid: true,
+
+        playThroughEarpieceAndroid: false,
+
+        playsInSilentModeIOS: true,
+
+      });
+
+    };
+
+    setupAudio();
+
+  }, []);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const [category, setCategory] = useState<Category | null>(null);
   const [affirmations, setAffirmations] = useState<Affirmation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [currentSound, setCurrentSound] = useState<Audio.Sound | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(1);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [likedIds, setLikedIds] = useState<string[]>([]);
+  const [likesCount, setLikesCount] = useState<Record<string, number>>({});
+
   const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
+
+  console.log(affirmations);
 
   const getCategoryGradient = (imageUrl: string | null): string[] => {
     switch (imageUrl) {
@@ -95,12 +145,17 @@ export default function CategoryDetailScreen() {
   const fetchData = async () => {
     try {
       const token = await AsyncStorage.getItem('access_token');
+      console.log("TOKEN REAL:", token);
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const response = await axios.get(`${BACKEND_URL}/api/categories/${id}`, { headers });
 
-      setCategory(response.data);
-      setAffirmations(response.data.affirmations);
+      const catResponse = await axios.get(
+        `${BACKEND_URL}/api/categories/${id}`,
+        { headers }
+      );
+
+      setCategory(catResponse.data);
+      setAffirmations(catResponse.data.affirmations);
     } catch (error) {
       console.error('Error fetching category:', error);
     } finally {
@@ -112,9 +167,10 @@ export default function CategoryDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
+      setIsPaused(false);
+
       return () => {
-        Speech.stop();
-        setPlayingId(null);
+
       };
     }, [id])
   );
@@ -126,37 +182,173 @@ export default function CategoryDetailScreen() {
 
   const handleToggleFavorite = async (affirmation: Affirmation) => {
     try {
+
       const token = await AsyncStorage.getItem('access_token');
-      const headers = { Authorization: `Bearer ${token}` };
+
+      console.log("TOKEN REAL:", token);
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
 
       if (affirmation.is_favorite) {
-        await axios.delete(`${BACKEND_URL}/api/favorites/${affirmation.id}`, { headers });
+
+        await axios.delete(
+          `${BACKEND_URL}/api/favorites/${affirmation.affirmation_id}`,
+          { headers }
+        );
+
       } else {
-        await axios.post(`${BACKEND_URL}/api/favorites/${affirmation.id}`, {}, { headers });
+
+        await axios.post(
+          `${BACKEND_URL}/api/favorites/${affirmation.affirmation_id}`,
+          {},
+          { headers }
+        );
+
       }
 
-      setAffirmations(affirmations.map(a =>
-        a.id === affirmation.id ? { ...a, is_favorite: !a.is_favorite } : a
-      ));
+      setAffirmations(
+        affirmations.map(a =>
+          a.affirmation_id === affirmation.affirmation_id
+            ? {
+              ...a,
+              is_favorite: !a.is_favorite
+            }
+            : a
+        )
+      );
+
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
   };
 
   const handlePlayAudio = async (affirmation: Affirmation) => {
-    if (playingId === affirmation.id) {
-      await Speech.stop();
-      setPlayingId(null);
-    } else {
-      await Speech.stop();
-      setPlayingId(affirmation.id);
-      Speech.speak(affirmation.text, {
-        language: 'es-ES',
-        pitch: 1.0,
-        rate: 0.9,
-        onDone: () => setPlayingId(null),
-        onError: () => setPlayingId(null),
+    try {
+
+      if (!affirmation.audio_url) return;
+
+      // MISMO AUDIO
+      if (
+        playingId === affirmation.affirmation_id &&
+        currentSound
+      ) {
+
+        const status = await currentSound.getStatusAsync();
+
+        if (status.isLoaded && status.isPlaying) {
+
+          await currentSound.pauseAsync();
+          setIsPaused(true);
+
+        } else {
+
+          if (
+            status.isLoaded &&
+            status.positionMillis >= (status.durationMillis || 0) - 500
+          ) {
+            await currentSound.setPositionAsync(0);
+          }
+
+          await currentSound.playAsync();
+          setIsPaused(false);
+        }
+
+        return;
+      }
+
+      // OTRO AUDIO
+      if (currentSound) {
+        await currentSound.stopAsync();
+        await currentSound.unloadAsync();
+      }
+
+      const { sound } =
+        await Audio.Sound.createAsync({
+          uri: affirmation.audio_url,
+        });
+
+      await sound.setStatusAsync({
+        shouldPlay: false,
       });
+
+      setCurrentSound(sound);
+      setPlayingId(affirmation.affirmation_id);
+      setIsPaused(false);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+
+        if (!status.isLoaded) return;
+
+        setPlaybackPosition(status.positionMillis || 0);
+        saveAudioProgress(
+          Number(affirmation.affirmation_id),
+          status.positionMillis || 0
+        );
+        setPlaybackDuration(status.durationMillis || 1);
+
+        if (status.didJustFinish) {
+
+          setIsPaused(true);
+
+          setPlaybackPosition(0);
+
+          saveAudioProgress(
+            Number(affirmation.affirmation_id),
+            0
+          );
+
+          const currentIndex =
+            affirmations.findIndex(
+              a =>
+                a.affirmation_id ===
+                affirmation.affirmation_id
+            );
+
+          const nextAudio =
+            affirmations[currentIndex + 1];
+
+          if (nextAudio?.audio_url) {
+
+            Audio.Sound.createAsync({
+              uri: nextAudio.audio_url,
+            });
+
+          }
+
+          if (nextAudio) {
+
+            handlePlayAudio(nextAudio);
+
+          }
+
+        }
+      });
+
+      await sound.setRateAsync(playbackRate, true);
+      const savedPosition =
+        await getAudioProgress(
+          Number(affirmation.affirmation_id)
+        );
+
+      if (savedPosition > 0) {
+
+        await sound.setPositionAsync(
+          savedPosition
+        );
+
+      }
+      await sound.playAsync();
+
+      setTimeout(async () => {
+
+        await updateMeditationStreak();
+
+      }, 30000);
+
+    } catch (error) {
+      console.log('Audio playback error:', error);
     }
   };
 
@@ -195,20 +387,18 @@ export default function CategoryDetailScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
+          <Image
+            source={{ uri: LUMINA_LOGO_SMALL_WHITE }}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.push('/(tabs)/home')}
+            style={styles.menuButton}
+            onPress={() => router.replace('/(tabs)/home')}
           >
-            <Image
-              source={{ uri: LUMINA_LOGO_SMALL_WHITE }}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-            <Text style={styles.backText}>{'< ATRAS'}</Text>
+            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+
         </View>
 
         {/* Category Banner */}
@@ -249,6 +439,7 @@ export default function CategoryDetailScreen() {
         {/* Affirmations List */}
         <View style={styles.listContainer}>
           <ScrollView
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -256,58 +447,201 @@ export default function CategoryDetailScreen() {
             contentContainerStyle={styles.scrollContent}
           >
             {affirmations.map((affirmation, index) => (
-              <View key={affirmation.id} style={styles.affirmationCard}>
+              <View key={affirmation.affirmation_id} style={styles.affirmationCard}>
                 <TouchableOpacity
                   style={styles.playButton}
-                  onPress={() => handlePlayAudio(affirmation)}
+                  onPress={() => {
+
+                    scrollRef.current?.scrollTo({
+
+                      y: index * 92,
+
+                      animated: true,
+
+                    });
+
+                    handlePlayAudio(affirmation);
+
+                  }}
                 >
                   <LinearGradient
-                    colors={playingId === affirmation.id ? ['#FF6B8A', '#FF9A6C'] : ['#F5A623', '#FF9500']}
+                    colors={String(playingId) === String(affirmation.affirmation_id) ? ['#FF6B8A', '#FF9A6C'] : ['#F5A623', '#FF9500']}
                     style={styles.playButtonGradient}
                   >
-                    <Text style={styles.playButtonNumber}>{index + 1}.</Text>
-                    {playingId === affirmation.id && (
-                      <Ionicons name="pause" size={10} color="#FFF" style={styles.playIcon} />
+                    {String(playingId) === String(affirmation.affirmation_id) ? (
+                      <Ionicons
+                        name={
+                          String(playingId) === String(affirmation.affirmation_id) &&
+                            !isPaused
+                            ? "pause"
+                            : "play"
+                        }
+                        size={12}
+                      />
+                    ) : (
+                      <Text style={styles.playButtonNumber}>
+                        {index + 1}.
+                      </Text>
                     )}
+
                   </LinearGradient>
                 </TouchableOpacity>
 
                 <View style={styles.affirmationContent}>
                   <Text style={styles.affirmationText} numberOfLines={2}>
-                    {affirmation.text}
+                    {affirmation.title || affirmation.text}
                   </Text>
                   <View style={styles.progressContainer}>
-                    <Text style={styles.timeText}>0:00</Text>
+
+                    <Text style={styles.timeText}>
+                      {String(playingId) === String(affirmation.affirmation_id)
+                        ? formatDuration(Math.floor(playbackPosition / 1000))
+                        : '0:00'}
+                    </Text>
                     <View style={styles.progressBar}>
-                      <View style={[
-                        styles.progressFill,
-                        { width: playingId === affirmation.id ? '50%' : '0%' }
-                      ]} />
+                      <Slider
+                        style={{
+                          flex: 1,
+                          height: 20,
+                          marginLeft: -10,
+                          marginRight: -10,
+                        }}
+                        minimumValue={0}
+                        maximumValue={playbackDuration}
+                        value={
+                          String(playingId) === String(affirmation.affirmation_id)
+                            ? playbackPosition
+                            : 0
+                        }
+                        minimumTrackTintColor="#1E3A5F"
+                        maximumTrackTintColor="#E5E7EB"
+                        thumbTintColor="#1E3A5F"
+                        thumbStyle={{ width: 12, height: 12 }}
+                        onValueChange={async (value) => {
+
+                          if (
+                            currentSound &&
+                            String(playingId) === String(affirmation.affirmation_id)
+                          ) {
+
+                            await currentSound.setPositionAsync(value);
+                            setPlaybackPosition(value);
+                          }
+
+                        }}
+                      />
                     </View>
-                    <Text style={styles.timeText}>{formatDuration(affirmation.duration)}</Text>
+                    <Text style={styles.timeText}>
+                      {String(playingId) === String(affirmation.affirmation_id)
+                        ? formatDuration(Math.floor(playbackDuration / 1000))
+                        : formatDuration(affirmation.duration)}
+                    </Text>
                   </View>
+                  <View style={styles.speedContainer}></View>
                 </View>
-
-                <TouchableOpacity
-                  style={styles.favoriteButton}
-                  onPress={() => handleToggleFavorite(affirmation)}
-                >
-                  <Ionicons
-                    name={affirmation.is_favorite ? 'bookmark' : 'bookmark-outline'}
-                    size={22}
-                    color={affirmation.is_favorite ? '#1E3A5F' : '#9CA3AF'}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.moreButton}>
-                  <Ionicons name="ellipsis-vertical" size={18} color="#9CA3AF" />
-                </TouchableOpacity>
               </View>
             ))}
           </ScrollView>
         </View>
-      </SafeAreaView>
-    </LinearGradient>
+        {playingId && (
+
+          <View style={styles.miniPlayer}>
+
+            <View style={{ flex: 1 }}>
+
+              <Text
+                style={styles.miniPlayerTitle}
+                numberOfLines={1}
+              >
+
+                {
+                  affirmations.find(
+                    a =>
+                      a.affirmation_id === playingId
+                  )?.title || 'Reproduciendo'
+                }
+
+              </Text>
+
+              <Text style={styles.miniPlayerSubtitle}>
+
+                {
+                  formatDuration(
+                    Math.floor(playbackPosition / 1000)
+                  )
+                }
+
+              </Text>
+
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+              <TouchableOpacity
+                onPress={async () => {
+
+                  const currentIndex =
+                    affirmations.findIndex(
+                      a => a.affirmation_id === playingId
+                    );
+
+                  const previousAudio =
+                    affirmations[currentIndex - 1];
+
+                  if (previousAudio) {
+                    handlePlayAudio(previousAudio);
+                  }
+
+                }}
+                style={{ marginRight: 18 }}
+              >
+                <Ionicons
+                  name="play-skip-back"
+                  size={22}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+
+                  if (!currentSound) return;
+
+                  const status =
+                    await currentSound.getStatusAsync();
+
+                  if (
+                    status.isLoaded &&
+                    status.isPlaying
+                  ) {
+
+                    await currentSound.pauseAsync();
+                    setIsPaused(true);
+
+                  } else {
+
+                    await currentSound.playAsync();
+                    setIsPaused(false);
+
+                  }
+
+                }}
+              >
+                <Ionicons
+                  name={isPaused ? 'play' : 'pause'}
+                  size={24}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+            </View>
+
+          </View>
+
+        )}
+
+      </SafeAreaView >
+    </LinearGradient >
   );
 }
 
@@ -513,5 +847,118 @@ const styles = StyleSheet.create({
   },
   moreButton: {
     padding: 6,
+  },
+  likesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 4,
+  },
+  likesText: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginTop: -1,
+  },
+
+  speedContainer: {
+
+    flexDirection: 'row',
+
+    marginTop: 8,
+
+    gap: 6,
+
+  },
+
+  speedButton: {
+
+    paddingHorizontal: 10,
+
+    paddingVertical: 4,
+
+    borderRadius: 12,
+
+    backgroundColor: '#F3F4F6',
+
+  },
+
+  speedButtonActive: {
+
+    backgroundColor: '#1E3A5F',
+
+  },
+
+  speedText: {
+
+    fontSize: 11,
+
+    fontWeight: '600',
+
+    color: '#6B7280',
+
+  },
+
+  speedTextActive: {
+
+    color: '#FFFFFF',
+
+  },
+
+  miniPlayer: {
+
+    position: 'absolute',
+
+    bottom: 20,
+
+    left: 20,
+
+    right: 20,
+
+    backgroundColor: '#1E3A5F',
+
+    borderRadius: 18,
+
+    paddingHorizontal: 18,
+
+    paddingVertical: 14,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    shadowColor: '#000',
+
+    shadowOffset: {
+      width: 0,
+      height: 8
+    },
+
+    shadowOpacity: 0.25,
+
+    shadowRadius: 20,
+
+    elevation: 10,
+
+  },
+
+  miniPlayerTitle: {
+
+    color: '#FFFFFF',
+
+    fontSize: 14,
+
+    fontWeight: '700',
+
+  },
+
+  miniPlayerSubtitle: {
+
+    color: 'rgba(255,255,255,0.7)',
+
+    fontSize: 12,
+
+    marginTop: 2,
+
   },
 });

@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -32,7 +34,9 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, checkAuth } = useAuth();
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -41,35 +45,90 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+
+    setErrorMessage('');
+
     try {
-      await login(email, password);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      await AsyncStorage.setItem(
+        'access_token',
+        data.session.access_token
+      );
+
+      console.log(
+        "TOKEN GUARDADO:",
+        data.session.access_token
+      );
+
       router.replace('/(tabs)/home');
+
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+
+      console.log(error);
+
+      if (
+        error?.message === 'Invalid login credentials'
+      ) {
+
+        setErrorMessage(
+          'Correo o contraseña incorrectos'
+        );
+
+        return;
+      }
+
+      setErrorMessage(
+        error?.message || 'Ocurrió un error'
+      );
+
     } finally {
+
       setLoading(false);
+
     }
+
   };
 
   const handleGoogleLogin = async () => {
     try {
-      const redirectUrl = Linking.createURL('auth-callback');
-      const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-      
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-      
-      if (result.type === 'success' && result.url) {
-        const url = result.url;
-        const sessionIdMatch = url.match(/session_id=([^&]+)/);
-        
-        if (sessionIdMatch && sessionIdMatch[1]) {
-          setLoading(true);
-          await loginWithGoogle(sessionIdMatch[1]);
-          router.replace('/(tabs)/home');
-        }
+      setLoading(true);
+
+      const redirectTo = Linking.createURL('auth-callback');
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectTo
+      );
+
+      if (result.type === 'success') {
+        await checkAuth();
+        router.replace('/(tabs)/home');
       }
+
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Error al iniciar sesión con Google');
+      Alert.alert(
+        'Error',
+        error.message || 'Error al iniciar sesión con Google'
+      );
     } finally {
       setLoading(false);
     }
@@ -102,8 +161,23 @@ export default function LoginScreen() {
             </View>
 
             {/* Title */}
-            <Text style={styles.title}>¡Hola!</Text>
-            <Text style={styles.subtitle}>Accede a tu cuenta llenando la información</Text>
+            <Text
+              style={[
+                styles.title,
+                { textAlign: 'center' }
+              ]}
+            >
+              ¡Hola!
+            </Text>
+
+            <Text
+              style={[
+                styles.subtitle,
+                { textAlign: 'center' }
+              ]}
+            >
+              Accede a tu cuenta llenando la información
+            </Text>
 
             {/* Email Input */}
             <View style={styles.inputContainer}>
@@ -129,6 +203,7 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
               />
+
               <TouchableOpacity
                 style={styles.eyeButton}
                 onPress={() => setShowPassword(!showPassword)}
@@ -139,17 +214,79 @@ export default function LoginScreen() {
                   color="#9CA3AF"
                 />
               </TouchableOpacity>
+
+              {errorMessage ? (
+                <Text
+                  style={{
+                    color: 'red',
+                    marginTop: 8,
+                    fontSize: 14,
+                  }}
+                >
+                  {errorMessage}
+                </Text>
+              ) : null}
+
+              {successMessage ? (
+                <Text
+                  style={{
+                    color: 'green',
+                    marginTop: 4,
+                    fontSize: 14,
+                  }}
+                >
+                  {successMessage}
+                </Text>
+              ) : null}
+
             </View>
 
             {/* Forgot Password & Login Button Row */}
             <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.forgotContainer}>
-                <Text style={styles.forgotPassword}>Olvidé mi contraseña</Text>
+
+              <TouchableOpacity
+                style={styles.forgotContainer}
+                onPress={async () => {
+
+                  if (!email) {
+                    setErrorMessage(
+                      'Ingresa tu correo primero.'
+                    );
+                    return;
+                  }
+
+                  setErrorMessage('');
+                  setSuccessMessage('');
+
+                  const { error } =
+                    await supabase.auth.resetPasswordForEmail(
+                      email
+                    );
+
+                  if (error) {
+
+                    setErrorMessage(
+                      error.message
+                    );
+
+                  } else {
+
+                    setSuccessMessage(
+                      'Te enviamos un enlace para recuperar tu contraseña.'
+                    );
+
+                  }
+
+                }}
+              >
+                <Text style={styles.forgotPassword}>
+                  Olvidé mi contraseña
+                </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.loginButton} 
-                onPress={handleLogin} 
+              <TouchableOpacity
+                style={styles.loginButton}
+                onPress={handleLogin}
                 disabled={loading}
               >
                 {loading ? (
@@ -158,19 +295,22 @@ export default function LoginScreen() {
                   <Text style={styles.loginButtonText}>Entrar</Text>
                 )}
               </TouchableOpacity>
+
             </View>
 
             {/* Google Login Button */}
             <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
               <Ionicons name="logo-google" size={20} color="#000" />
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
+              <Text style={styles.googleButtonText}>
+                Continuar con Google
+              </Text>
             </TouchableOpacity>
 
             {/* Divider */}
             <View style={styles.divider} />
 
             {/* Register Link */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.registerContainer}
               onPress={() => router.push('/(auth)/register')}
             >
@@ -178,8 +318,8 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
-    </ImageBackground>
+      </KeyboardAvoidingView >
+    </ImageBackground >
   );
 }
 

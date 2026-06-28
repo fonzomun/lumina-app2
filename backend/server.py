@@ -1,10 +1,12 @@
 from dotenv import load_dotenv
+from supabase import create_client
+from supabase import create_client, Client
 load_dotenv()
 
 import os
 import uuid
 import bcrypt
-import jwt
+from jose import jwt
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
@@ -17,11 +19,18 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 
 # Configuration
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb+srv://fonzomun:mapachex1@cluster0.t9qxth8.mongodb.net/lumina?appName=Cluster0")
+MONGO_URL = "mongodb+srv://fonzomun:mapachex1@cluster0.t9qxth8.mongodb.net/lumina?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = os.environ.get("DB_NAME", "lumina")
 JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
 JWT_ALGORITHM = "HS256"
 AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "https://demobackend.emergentagent.com")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+supabase: Client = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
 
 # Pydantic Models
 class UserRegister(BaseModel):
@@ -81,6 +90,7 @@ async def lifespan(app: FastAPI):
     global client, db
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]
+    likes_collection = db.likes
     print("DB usada:", DB_NAME)
     
     # Create indexes
@@ -120,7 +130,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(user_id: str, email: str) -> str:
     payload = {
-        "sub": user_id,
+        "sub": user["user_id"],
         "email": email,
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
         "type": "access"
@@ -137,28 +147,39 @@ def create_refresh_token(user_id: str) -> str:
 
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("access_token")
+
     if not token:
         auth_header = request.headers.get("Authorization", "")
+        print("AUTH HEADER:", auth_header)
+
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
-    
+            print("TOKEN EXTRAIDO:", token)
+
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
+
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        
-        user = await db.users.find_one({"user_id": payload["sub"]}, {"_id": 0})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        
-        user.pop("password_hash", None)
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+        payload = jwt.decode(
+           token,
+           JWT_SECRET,
+           options={
+               "verify_signature": False,
+               "verify_aud": False
+            }
+        )
+
+        user_id = payload.get("sub")
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        return {
+            "user_id": user_id
+        }
+
+    except Exception as e:
+        print("AUTH ERROR:", e)
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def seed_data():
@@ -287,24 +308,68 @@ async def seed_data():
     
     affirmations_to_insert = []
     for cat_id, texts in affirmations_data.items():
-        for i, text in enumerate(texts):
             affirmations_to_insert.append({
-                "affirmation_id": f"aff_{cat_id}_{i+1}",
-                "text": text,
+                "affirmation_id": "aff_cat_morning_1",
+                'title': 'Meditacion para comenzar el dia',
+                "text": "Meditacion para comenzar el dia",
                 "category_id": cat_id,
                 "duration": 240,  # 4 minutes
-                "order": i + 1,
+                "order": 1,
+                "audio_url": "https://dahnssobfwceutnshvdj.supabase.co/storage/v1/object/public/Audios/Meditacion%20para%20comenzar%20el%20dia.mp3",
                 "created_at": datetime.now(timezone.utc)
             })
+
+            affirmations_to_insert.append({
+                "affirmation_id": "aff_cat_morning_2",
+                'title': '1 test',
+                "text": "1 test",
+                "category_id": cat_id,
+                "duration": 240,  # 4 minutes
+                "order": 2,
+                "audio_url": "https://dahnssobfwceutnshvdj.supabase.co/storage/v1/object/public/Audios/1%20test.mp3",
+                "created_at": datetime.now(timezone.utc)    
+            })
+
+            affirmations_to_insert.append({
+                "affirmation_id": "aff_cat_morning_3",
+                'title': '2 test',
+                "text": "2 test",
+                "category_id": cat_id,
+                "duration": 240,  # 4 minutes
+                "order": 3,
+                "audio_url": "https://dahnssobfwceutnshvdj.supabase.co/storage/v1/object/public/Audios/2%20test.mp3",
+                "created_at": datetime.now(timezone.utc)    
+            })
     
-    await db.affirmations.delete_many({})
-    await db.affirmations.insert_many(affirmations_to_insert)
+    # await db.affirmations.insert_many(affirmations_to_insert)
     print("Seeded categories and affirmations successfully!")
 
 # Routes
 @app.get("/api/health")
+
 async def health_check():
     return {"status": "healthy", "service": "Lumina API"}
+
+@app.post("/api/admin/upload-audio")
+async def upload_audio(data: dict):
+
+    affirmation = {
+        "affirmation_id": f"aff_{int(datetime.now().timestamp())}",
+        "title": data["title"],
+        "text": data["title"],
+        "category_id": data["category"],
+        "duration": 240,
+        "order": int(data["order"]),
+        "audio_url": data["audio_url"],
+        "created_at": datetime.now(timezone.utc)
+    }
+
+    await db.affirmations.insert_one(affirmation)
+
+    return {
+        "success": True
+    }
+
 
 # Auth Routes
 @app.post("/api/auth/register")
@@ -513,19 +578,59 @@ async def get_categories(request: Request):
     return result 
 
 @app.get("/api/categories/{category_id}")
-async def get_category(category_id: str):
-    category = await db.categories.find_one(
-        {"category_id": category_id},
-        {"_id": 0}
-    )
+async def get_category(
+    category_id: str,
+    request: Request
+):
+
+    try:
+        user = await get_current_user(request)
+        user_id = user["user_id"]
+    except:
+        user_id = None
+
+    category = await db.categories.find_one({
+        "category_id": category_id
+    })
 
     if not category:
-        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+        raise HTTPException(
+            status_code=404,
+            detail="Categoría no encontrada"
+        )
 
-    affirmations = await db.affirmations.find(
-        {"category_id": category_id},
-        {"_id": 0}
-    ).to_list(100)
+    category.pop("_id", None)
+
+    affirmations = await db.affirmations.find({
+        "category_id": category_id
+    }).to_list(100)
+
+    for affirmation in affirmations:
+
+        affirmation.pop("_id", None)
+
+        like = None
+        favorite = None
+
+        if user_id:
+
+            like = await db.likes.find_one({
+                "user_id": user_id,
+                "affirmation_id": affirmation["affirmation_id"]
+            })
+
+            favorite = await db.favorites.find_one({
+                "user_id": user_id,
+                "affirmation_id": affirmation["affirmation_id"]
+            })
+
+        affirmation["is_liked"] = like is not None
+
+        affirmation["is_favorite"] = favorite is not None
+
+        affirmation["likes_count"] = await db.likes.count_documents({
+            "affirmation_id": affirmation["affirmation_id"]
+        })
 
     return {
         **category,
@@ -679,6 +784,98 @@ async def create_affirmation(data: AffirmationCreate):
     result = await db.affirmations.insert_one(affirmation)
     return {"id": str(result.inserted_id), **affirmation}
 
+@app.get("/api/admin/audios")
+async def get_admin_audios():
+
+    audios = await db.affirmations.find({}).to_list(100)
+
+    for audio in audios:
+        audio.pop("_id", None)
+
+    return audios
+
+@app.delete("/api/admin/audio/{affirmation_id}")
+async def delete_audio(affirmation_id: str):
+
+    await db.affirmations.delete_one({
+        "affirmation_id": affirmation_id
+    })
+
+    return {
+        "success": True
+    }
+@app.post("/api/likes/{affirmation_id}")
+async def toggle_like(affirmation_id: str, request: Request):
+
+    user = await get_current_user(request)
+
+    affirmation = await db.affirmations.find_one({
+        "affirmation_id": affirmation_id
+    })
+
+    if not affirmation:
+        raise HTTPException(
+            status_code=404,
+            detail="Afirmación no encontrada"
+        )
+
+    existing_like = await db.likes.find_one({
+        "user_id": user["user_id"],
+        "affirmation_id": affirmation_id
+    })
+
+    print("USER:", user["user_id"])
+    print("AFFIRMATION:", affirmation_id)
+    print("EXISTING LIKE:", existing_like)
+
+    if existing_like:
+
+        await db.likes.delete_one({
+            "_id": existing_like["_id"]
+        })
+
+        liked = False
+
+    else:
+        print("INSERTANDO LIKE")
+        
+        await db.likes.insert_one({
+            "user_id": user["user_id"],
+            "affirmation_id": affirmation_id,
+            "created_at": datetime.now(timezone.utc)
+        })
+
+        liked = True
+
+    likes_count = await db.likes.count_documents({
+        "affirmation_id": affirmation_id
+    })
+
+    return {
+        "liked": liked,
+        "likes_count": likes_count
+    }
+
+
+@app.get("/api/likes/{affirmation_id}")
+async def get_likes(affirmation_id: str, request: Request):
+
+    user = await get_current_user(request)
+
+    likes_count = await db.likes.count_documents({
+        "affirmation_id": affirmation_id
+    })
+
+    existing_like = await db.likes.find_one({
+        "user_id": user["user_id"],
+        "affirmation_id": affirmation_id
+    })
+
+    return {
+        "likes_count": likes_count,
+        "liked": existing_like is not None
+    }
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
+

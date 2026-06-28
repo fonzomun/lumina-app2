@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
+import { supabase } from '../lib/supabase';
 
-const BACKEND_URL = "http://127.0.0.1:8001";
+const BACKEND_URL = "http://192.168.1.78:8000";
 
 interface User {
+  onboardingComplete?: boolean;
   user_id: string;
   email: string;
   name: string;
@@ -43,22 +45,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const checkAuth = async () => {
+
     try {
-      const token = await AsyncStorage.getItem('access_token');
-      if (!token) {
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
         setUser(null);
         setLoading(false);
         return;
       }
 
-      const response = await api.get('/api/auth/me');
-      setUser(response.data);
+      const onboardingComplete =
+        await AsyncStorage.getItem('lumina_onboarding_complete');
+
+      setUser({
+        user_id: session.user.id,
+        email: session.user.email || '',
+        name:
+          session.user.user_metadata?.name || '',
+        onboardingComplete:
+          onboardingComplete === 'true',
+      });
     } catch (error) {
+
       console.log('Auth check failed:', error);
-      await AsyncStorage.removeItem('access_token');
+
       setUser(null);
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
@@ -71,32 +91,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.post('/api/auth/login', { email, password });
       const { access_token, ...userData } = response.data;
       await AsyncStorage.setItem('access_token', access_token);
-      setUser(userData);
+      const onboardingComplete =
+        await AsyncStorage.getItem('lumina_onboarding_complete');
+
+      setUser({
+        ...userData,
+        onboardingComplete:
+          onboardingComplete === 'true',
+      });
     } catch (error: any) {
       const message = error.response?.data?.detail || 'Error al iniciar sesión';
       throw new Error(message);
     }
   };
 
-const register = async (email: string, password: string, name: string) => {
-  try {
-    const response = await api.post('/api/auth/register', { email, password, name });
-    const { access_token, ...userData } = response.data;
-    await AsyncStorage.setItem('access_token', access_token);
-    setUser(userData);
-  } catch (error: any) {
-    console.log("REGISTER ERROR:", error.response?.data);
-    const message = error.response?.data?.detail || 'Error al registrarse';
-    throw new Error(message);
-  }
-};
+  const register = async (email: string, password: string, name: string) => {
+    try {
+
+      const response = await api.post('/api/auth/register', {
+        email,
+        password,
+        name
+      });
+
+      const { access_token, ...userData } = response.data;
+
+      if (access_token) {
+        await AsyncStorage.setItem('access_token', access_token);
+        setUser(userData);
+      }
+
+      if (Platform.OS === 'web') {
+        window.alert('Te enviamos un enlace para verificar tu cuenta.');
+      } else {
+        Alert.alert(
+          'Revisa tu correo',
+          'Te enviamos un enlace para verificar tu cuenta.'
+        );
+      }
+
+    } catch (error: any) {
+      const message = error.response?.data?.detail || 'Error al registrarse';
+      throw new Error(message);
+    }
+  };
 
   const loginWithGoogle = async (sessionId: string) => {
     try {
       const response = await api.post('/api/auth/google', { session_id: sessionId });
       const { access_token, ...userData } = response.data;
       await AsyncStorage.setItem('access_token', access_token);
-      setUser(userData);
+      const onboardingComplete =
+        await AsyncStorage.getItem('lumina_onboarding_complete');
+
+      setUser({
+        ...userData,
+        onboardingComplete:
+          onboardingComplete === 'true',
+      });
     } catch (error: any) {
       const message = error.response?.data?.detail || 'Error con Google';
       throw new Error(message);
@@ -104,15 +156,13 @@ const register = async (email: string, password: string, name: string) => {
   };
 
   const logout = async () => {
-   try {
-      await api.post('/api/auth/logout');
-    } catch (error) {
-      console.log('Logout error:', error);
-    } finally {
-      await AsyncStorage.removeItem('access_token');
-      setUser(null);
-    }
-  };
+
+    await AsyncStorage.removeItem('access_token');
+
+    await supabase.auth.signOut();
+
+    setUser(null);
+  }
 
   return (
     <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout, checkAuth }}>

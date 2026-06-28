@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,7 +32,9 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { register, loginWithGoogle } = useAuth();
@@ -42,22 +45,48 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden');
-      return;
-    }
-
     if (password.length < 6) {
       Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
       return;
     }
+    if (password !== confirmPassword) {
+      setErrorMessage('Las contraseñas no coinciden');
+      return;
+    }
 
+    setErrorMessage('');
+    setSuccessMessage('');
     setLoading(true);
     try {
-      await register(email, password, name);
-      router.replace('/(tabs)/home');
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo:
+            'https://www.comunidadlumina.com/auth-callback',
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSuccessMessage(
+        'Te enviamos un enlace para verificar tu cuenta. Revisa tu correo.'
+      );
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      if (
+        error.message?.includes('rate limit')
+      ) {
+        setErrorMessage(
+          'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
+        );
+      } else {
+        setErrorMessage(
+          error.message || 'No se pudo crear la cuenta'
+        );
+      }
+
     } finally {
       setLoading(false);
     }
@@ -65,15 +94,15 @@ export default function RegisterScreen() {
 
   const handleGoogleLogin = async () => {
     try {
-      const redirectUrl = Linking.createURL('auth-callback');
+      const redirectUrl = `${window.location.origin}/auth-callback`;
       const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-      
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-      
+
+      window.location.href = authUrl;
+
       if (result.type === 'success' && result.url) {
         const url = result.url;
         const sessionIdMatch = url.match(/session_id=([^&]+)/);
-        
+
         if (sessionIdMatch && sessionIdMatch[1]) {
           setLoading(true);
           await loginWithGoogle(sessionIdMatch[1]);
@@ -108,113 +137,248 @@ export default function RegisterScreen() {
 
           {/* Register Card */}
           <View style={styles.card}>
-            {/* Logo Image */}
-            <View style={styles.logoContainer}>
-              <Image
-                source={{ uri: LUMINA_LOGO_BIG_COLOR }}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
 
             {/* Title */}
-            <Text style={styles.title}>¡Bienvenido!</Text>
-            <Text style={styles.subtitle}>Crea tu cuenta para comenzar tu transformación</Text>
+            {!successMessage && (
+              <>
+                <Text style={styles.title}>¡Bienvenido!</Text>
 
-            {/* Name Input */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Nombre completo"
-                placeholderTextColor="#9CA3AF"
-                value={name}
-                onChangeText={setName}
-                autoCorrect={false}
-              />
-            </View>
+                <Text style={styles.subtitle}>
+                  Crea tu cuenta para comenzar tu transformación
+                </Text>
 
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Correo"
-                placeholderTextColor="#9CA3AF"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
+                {/* Name Input */}
 
-            {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Contraseña"
-                placeholderTextColor="#9CA3AF"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
+                {/* Name Input */}
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nombre completo"
+                    placeholderTextColor="#9CA3AF"
+                    value={name}
+                    onChangeText={setName}
+                    autoCorrect={false}
+                  />
+                </View>
+
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Correo"
+                    placeholderTextColor="#9CA3AF"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Contraseña"
+                    placeholderTextColor="#9CA3AF"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                      size={22}
+                      color="#9CA3AF"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Confirm Password Input */}
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirmar contraseña"
+                    placeholderTextColor="#9CA3AF"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                </View>
+
+                {errorMessage ? (
+                  <Text
+                    style={{
+                      color: 'red',
+                      marginTop: 4,
+                      marginBottom: 8,
+                      fontSize: 14,
+                    }}
+                  >
+                    {errorMessage}
+                  </Text>
+                ) : null}
+
+
+                <TouchableOpacity
+                  style={styles.registerButton}
+                  onPress={handleRegister}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <Text style={styles.registerButtonText}>
+                      Crear Cuenta
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+
+                <TouchableOpacity
+                  style={styles.googleButton}
+                  onPress={handleGoogleLogin}
+                >
+                  <Ionicons
+                    name="logo-google"
+                    size={20}
+                    color="#000"
+                  />
+                  <Text style={styles.googleButtonText}>
+                    Continue with Google
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+              </>
+            )}
+
+            {successMessage ? (
+              <View
+                style={{
+                  marginTop: 30,
+                  alignItems: 'center',
+                }}
               >
-                <Ionicons
-                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                  size={22}
-                  color="#9CA3AF"
-                />
-              </TouchableOpacity>
-            </View>
+                <View
+                  style={{
+                    width: 90,
+                    height: 90,
+                    borderRadius: 45,
+                    backgroundColor: '#EEF8F0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 24,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 42,
+                      color: '#42C45F',
+                      fontWeight: '700',
+                    }}
+                  >
+                    ✓
+                  </Text>
+                </View>
 
-            {/* Confirm Password Input */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Confirmar contraseña"
-                placeholderTextColor="#9CA3AF"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showPassword}
-              />
-            </View>
+                <Text
+                  style={{
+                    fontSize: 34,
+                    fontWeight: '800',
+                    color: '#123B7A',
+                    textAlign: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  ¡Revisa tu correo!
+                </Text>
 
-            {/* Register Button */}
-            <TouchableOpacity 
-              style={styles.registerButton} 
-              onPress={handleRegister} 
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFF" size="small" />
-              ) : (
-                <Text style={styles.registerButtonText}>Crear Cuenta</Text>
-              )}
-            </TouchableOpacity>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    color: '#5B6475',
+                    textAlign: 'center',
+                    lineHeight: 28,
+                    marginBottom: 28,
+                  }}
+                >
+                  Te enviamos un enlace para verificar tu cuenta.
+                </Text>
 
-            {/* Google Login Button */}
-            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-              <Ionicons name="logo-google" size={20} color="#000" />
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
-            </TouchableOpacity>
+                <View
+                  style={{
+                    backgroundColor: '#F4F1FF',
+                    borderRadius: 20,
+                    padding: 18,
+                    marginBottom: 24,
+                    width: '100%',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      color: '#4F46E5',
+                      fontWeight: '600',
+                      lineHeight: 24,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Una vez verificada podrás iniciar sesión y comenzar tu transformación.
+                  </Text>
+                </View>
 
-            {/* Divider */}
-            <View style={styles.divider} />
+                <Text
+                  style={{
+                    textAlign: 'center',
+                    color: '#7A7F8A',
+                    fontSize: 14,
+                    lineHeight: 24,
+                  }}
+                >
+                  📩 Revisa también spam o promociones.
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => router.push('/login')}
+                  style={{
+                    marginTop: 30,
+                  }}
+                >
+                  <Text
+                    style={{
+                      textAlign: 'center',
+                      color: '#6C63FF',
+                      fontSize: 16,
+                      fontWeight: '700',
+                    }}
+                  >
+                    ¿Ya verificaste tu cuenta? Iniciar sesión
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
 
             {/* Login Link */}
-            <TouchableOpacity 
-              style={styles.loginContainer}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-              <Text style={styles.loginLink}>Iniciar Sesión</Text>
-            </TouchableOpacity>
+            {!successMessage && (
+              <>
+                <TouchableOpacity
+                  style={styles.loginContainer}
+                  onPress={() => router.replace('/(auth)/login')}
+                >
+                  <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
+                  <Text style={styles.loginLink}>Iniciar Sesión</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </ImageBackground >
   );
 }
 
@@ -248,25 +412,19 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 12,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  logoImage: {
-    width: 120,
-    height: 44,
-  },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1E3A5F',
     marginBottom: 6,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 18,
     lineHeight: 20,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 12,

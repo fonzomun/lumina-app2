@@ -3,19 +3,45 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Index() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        router.replace('/(tabs)/home');
-      } else {
-        router.replace('/(auth)/login');
+
+    const checkRoute = async () => {
+
+      if (!loading) {
+
+        if (user) {
+
+          const onboardingComplete =
+            await AsyncStorage.getItem(
+              'lumina_onboarding_complete'
+            );
+
+          if (onboardingComplete === 'true') {
+
+            router.replace('/(tabs)/home');
+
+          } else {
+
+            router.replace('/onboarding');
+
+          }
+
+        } else {
+
+          router.replace('/(auth)/login');
+
+        }
       }
-    }
+    };
+
+    checkRoute();
+
   }, [user, loading]);
 
   return (
