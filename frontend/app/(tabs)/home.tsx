@@ -24,7 +24,7 @@ import {
   getMeditationStreak
 } from '@/lib/streaks';
 
-const BACKEND_URL = "http://192.168.1.78:8001";
+const BACKEND_URL = "https://lumina-app2.onrender.com";
 const { width } = Dimensions.get('window');
 
 // Official Lumina logo

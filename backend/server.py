@@ -130,7 +130,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(user_id: str, email: str) -> str:
     payload = {
-        "sub": user["user_id"],
+        "sub": user_id,
         "email": email,
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
         "type": "access"

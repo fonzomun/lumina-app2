@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Platform, Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 
-const BACKEND_URL = "http://192.168.1.78:8000";
+const BACKEND_URL = "https://lumina-app2.onrender.com";
 
 interface User {
   onboardingComplete?: boolean;
