@@ -879,3 +879,19 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
 
+
+
+# Keep-alive para evitar que Render duerma el servidor
+import threading
+
+def keep_alive():
+    import time
+    import requests
+    while True:
+        time.sleep(600)  # cada 10 minutos
+        try:
+            requests.get("https://lumina-app2.onrender.com/health")
+        except:
+            pass
+
+threading.Thread(target=keep_alive, daemon=True).start()

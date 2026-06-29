@@ -102,7 +102,9 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      const redirectTo = Linking.createURL('auth-callback');
+      const redirectTo = __DEV__
+        ? Linking.createURL('auth-callback')
+        : 'com.fonzomun.lumina.app://auth-callback';
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
