@@ -32,7 +32,7 @@ import {
   getAudioProgress
 } from '@/lib/audio-progress';
 
-const BACKEND_URL = 'http://192.168.1.78:8001';
+const BACKEND_URL = 'https://lumina-app2.onrender.com';
 
 // Official Lumina logo (white version for dark backgrounds)
 const LUMINA_LOGO_SMALL_WHITE = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/n1098pix_Lumina-app_small-logo-white.png';
