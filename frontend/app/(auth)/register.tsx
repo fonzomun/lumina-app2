@@ -63,7 +63,7 @@ export default function RegisterScreen() {
         password,
         options: {
           emailRedirectTo:
-            'https://www.comunidadlumina.com/auth-callback',
+            'lumina://auth-callback',
         },
       });
 
@@ -94,8 +94,7 @@ export default function RegisterScreen() {
 
   const handleGoogleLogin = async () => {
     try {
-      const redirectUrl = `${window.location.origin}/auth-callback`;
-      const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+      const redirectUrl = 'lumina://auth-callback';
 
       window.location.href = authUrl;
 
