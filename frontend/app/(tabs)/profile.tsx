@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../../lib/supabase';
 
 // Official Lumina logo
 const LUMINA_LOGO_SMALL_COLOR = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/vo6dtgtz_Lumina-app_small-logo-color.png';
@@ -42,6 +43,8 @@ export default function ProfileScreen() {
 
   const [displayName, setDisplayName] =
     useState('');
+
+  const [userEmail, setUserEmail] = useState('');
 
   const [profilePhoto, setProfilePhoto] =
     useState<string | null>(null);
@@ -89,6 +92,12 @@ export default function ProfileScreen() {
     setDisplayName(savedName || '');
 
     setProfilePhoto(savedPhoto || null);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.email) {
+      setUserEmail(session.user.email);
+
+    }
 
   }
 
@@ -150,7 +159,7 @@ export default function ProfileScreen() {
             <Text style={styles.userName}>
               {displayName || 'Usuario'}
             </Text>
-            <Text style={styles.userEmail}>{user?.email || ''}</Text>
+            <Text style={styles.userEmail}>{userEmail}</Text>
           </LinearGradient>
 
           <View style={styles.menuContainer}>

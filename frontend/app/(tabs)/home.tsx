@@ -246,7 +246,7 @@ export default function HomeScreen() {
     ];
 
   const firstName =
-    displayName || 'Usuario';
+    displayName || user?.name || 'Viajero';
 
   if (loading) {
     return (
