@@ -135,7 +135,7 @@ export default function FavoritesScreen() {
 
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => router.replace('/(tabs)/home')}
           >
             <Ionicons name="arrow-back" size={24} color="#1C3354" />
           </TouchableOpacity>
@@ -216,7 +216,7 @@ export default function FavoritesScreen() {
           ))}
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </LinearGradient >
   );
 }
 
