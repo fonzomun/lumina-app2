@@ -186,18 +186,6 @@ export default function EditProfileScreen() {
             return;
         }
 
-        if (
-            !displayName.trim() ||
-            !country ||
-            !gender ||
-            selectedAvatar === null
-        ) {
-            Alert.alert(
-                'Por favor completa todos los campos.'
-            );
-            return;
-        }
-
         await supabase
             .from('profiles')
             .update({
