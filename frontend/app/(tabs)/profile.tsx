@@ -67,6 +67,14 @@ export default function ProfileScreen() {
   );
 
   const loadProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id) {
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      if (profileData) {
+        if (profileData.avatar !== null) setSelectedAvatar(Number(profileData.avatar));
+        if (profileData.display_name) setDisplayName(profileData.display_name);
+      }
+    }
 
     const avatar =
       await AsyncStorage.getItem(
