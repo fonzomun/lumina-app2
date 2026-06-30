@@ -201,8 +201,8 @@ export default function HomeScreen() {
   };
 
   const getSmallCardImage = (imageUrl: string | null): any => {
-    if (imageUrl && CATEGORY_IMAGES[imageUrl]) {
-      return CATEGORY_IMAGES[imageUrl];
+    const catKey = imageUrl?.replace("cat_", ""); if (catKey && CATEGORY_IMAGES[catKey]) {
+      return CATEGORY_IMAGES[catKey];
     }
     return null;
   };
