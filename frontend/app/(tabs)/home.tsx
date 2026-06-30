@@ -208,7 +208,7 @@ export default function HomeScreen() {
   };
 
   const handlePromoBannerPress = () => {
-    Linking.openURL(PROMO_BANNER_LINK);
+    Linking.openURL('https://www.comunidadlumina.com');
   };
 
   const largeCategories = categories.filter(c => c.priority === 1);
@@ -419,7 +419,7 @@ export default function HomeScreen() {
                     />
                   ) : (
                     <LinearGradient
-                      colors={getCategoryGradient(category.image_url)}
+                      colors={getCategoryGradient(category.id)}
                       style={styles.smallCardGradient}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}

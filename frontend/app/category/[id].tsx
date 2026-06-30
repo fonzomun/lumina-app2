@@ -35,16 +35,14 @@ import {
 const BACKEND_URL = 'https://lumina-app2.onrender.com';
 
 // Official Lumina logo (white version for dark backgrounds)
-const LUMINA_LOGO_SMALL_WHITE = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/n1098pix_Lumina-app_small-logo-white.png';
-
-// Category detail banner images
-const BANNER_IMAGES: { [key: string]: string } = {
-  morning: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/5f9okmcy_Lumina-app_morming-detail-banner.png',
-  night: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/qjlywu4r_Lumina-app_night-detail-banner.png',
-  love: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/54s3yal1_Lumina%20App%20export-14.png', // Emocionales - pink
-  abundance: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/juwh2217_Lumina%20App%20export-15.png', // Poder Personal - yellow
-  spiritual: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/7ayjq3y9_Lumina%20App%20export-16.png', // Espiritual - purple
-  confidence: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/asvpktip_Lumina%20App%20export-17.png', // Sanación - teal
+const LUMINA_LOGO_SMALL_WHITE = require('@/assets/images/lumina-assets/logo-small-white.png');
+const BANNER_IMAGES: { [key: string]: any } = {
+  morning: require('@/assets/images/lumina-assets/banner-morning.png'),
+  night: require('@/assets/images/lumina-assets/banner-night.png'),
+  love: require('@/assets/images/lumina-assets/banner-love.png'),
+  abundance: require('@/assets/images/lumina-assets/banner-abundance.png'),
+  spiritual: require('@/assets/images/lumina-assets/banner-spiritual.png'),
+  confidence: require('@/assets/images/lumina-assets/banner-confidence.png'),
 };
 
 interface Category {
@@ -125,7 +123,7 @@ export default function CategoryDetailScreen() {
 
   const getBannerImage = (imageUrl: string | null): string | null => {
     if (imageUrl && BANNER_IMAGES[imageUrl]) {
-      return BANNER_IMAGES[imageUrl];
+      return BANNER_IMAGES[imageUrl.replace('cat_', '')];
     }
     return null;
   };
@@ -388,7 +386,7 @@ export default function CategoryDetailScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Image
-            source={{ uri: LUMINA_LOGO_SMALL_WHITE }}
+            source={LUMINA_LOGO_SMALL_WHITE}
             style={styles.logoImage}
             resizeMode="contain"
           />
