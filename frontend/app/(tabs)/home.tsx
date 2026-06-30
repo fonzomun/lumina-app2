@@ -28,27 +28,17 @@ const BACKEND_URL = "https://lumina-app2.onrender.com";
 const { width } = Dimensions.get('window');
 
 // Official Lumina logo
-const LUMINA_LOGO_SMALL_COLOR = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/vo6dtgtz_Lumina-app_small-logo-color.png';
+const LUMINA_LOGO_SMALL_COLOR = require('@/assets/images/lumina-assets/logo-small-color.png');
+const TAGLINE_IMAGE = require('@/assets/images/lumina-assets/tagline.png');
+const PROMO_BANNER_IMAGE = require('@/assets/images/lumina-assets/banner.png');
 
-// Home tagline image
-const TAGLINE_IMAGE = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/qeeqtysi_lumina-fondo-app-texto-trasciende.png';
-
-// Promotional banner
-const PROMO_BANNER_IMAGE = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/hqnowwia_lumina-app-comunidad-curso-abundancia-banner.png';
-const PROMO_BANNER_LINK = 'https://www.comunidadlumina.com/curso-landing-5';
-
-// Category card background images
-const CARD_IMAGES = {
-  morning: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/3719nh7p_Lumina-app_large-card.png',
-  night: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/3aud4ir5_Lumina-app_medium-card.png',
-};
-
-// Small category card images
-const SMALL_CARD_IMAGES: { [key: string]: string } = {
-  love: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/qly4gqng_Lumina%20App%20export-10.png', // Emocionales
-  abundance: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/7xf36okz_Lumina%20App%20export-11.png', // Poder Personal
-  spiritual: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/nzayjyfs_Lumina%20App%20export-12.png', // Espiritual
-  confidence: 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/s3vfnnj2_Lumina%20App%20export-13.png', // Sanación
+const CATEGORY_IMAGES: Record<string, any> = {
+  morning: require('@/assets/images/lumina-assets/cat-morning.png'),
+  night: require('@/assets/images/lumina-assets/cat-night.png'),
+  love: require('@/assets/images/lumina-assets/cat-love.png'),
+  abundance: require('@/assets/images/lumina-assets/cat-abundance.png'),
+  spiritual: require('@/assets/images/lumina-assets/cat-spiritual.png'),
+  confidence: require('@/assets/images/lumina-assets/cat-confidence.png'),
 };
 
 interface Category {
@@ -210,9 +200,9 @@ export default function HomeScreen() {
     }
   };
 
-  const getSmallCardImage = (imageUrl: string | null): string | null => {
-    if (imageUrl && SMALL_CARD_IMAGES[imageUrl]) {
-      return SMALL_CARD_IMAGES[imageUrl];
+  const getSmallCardImage = (imageUrl: string | null): any => {
+    if (imageUrl && CATEGORY_IMAGES[imageUrl]) {
+      return CATEGORY_IMAGES[imageUrl];
     }
     return null;
   };
@@ -300,7 +290,7 @@ export default function HomeScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Image
-              source={{ uri: LUMINA_LOGO_SMALL_COLOR }}
+              source={LUMINA_LOGO_SMALL_COLOR}
               style={styles.logoImage}
               resizeMode="contain"
             />
@@ -350,7 +340,7 @@ export default function HomeScreen() {
           {/* Tagline Image */}
           <View style={styles.taglineContainer}>
             <Image
-              source={{ uri: TAGLINE_IMAGE }}
+              source={TAGLINE_IMAGE}
               style={styles.taglineImage}
               resizeMode="contain"
             />
@@ -452,7 +442,7 @@ export default function HomeScreen() {
             activeOpacity={0.9}
           >
             <Image
-              source={{ uri: PROMO_BANNER_IMAGE }}
+              source={PROMO_BANNER_IMAGE}
               style={styles.promoBannerImage}
               resizeMode="cover"
             />

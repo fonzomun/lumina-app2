@@ -25,8 +25,8 @@ const { width, height } = Dimensions.get('window');
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 // Official Lumina assets
-const LUMINA_LOGO_BIG_COLOR = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/bmr6bqte_Lumina-app_big-logo-color.png';
-const BACKGROUND_IMAGE = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/dcdozmbx_lumina_fondo.jpg';
+const LUMINA_LOGO_BIG_COLOR = require('@/assets/images/lumina-assets/logo-big-color.png');
+const BACKGROUND_IMAGE = require('@/assets/images/lumina-assets/fondo.jpg');
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
