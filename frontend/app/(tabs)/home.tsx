@@ -355,7 +355,7 @@ export default function HomeScreen() {
               activeOpacity={0.9}
             >
               <Image
-                source={{ uri: CARD_IMAGES.morning }}
+                source={CATEGORY_IMAGES.morning}
                 style={styles.largeCardImage}
                 resizeMode="cover"
               />
@@ -382,7 +382,7 @@ export default function HomeScreen() {
               activeOpacity={0.9}
             >
               <Image
-                source={{ uri: CARD_IMAGES.night }}
+                source={CATEGORY_IMAGES.night}
                 style={styles.mediumCardImage}
                 resizeMode="cover"
               />
@@ -413,7 +413,7 @@ export default function HomeScreen() {
                 >
                   {smallImage ? (
                     <Image
-                      source={{ uri: smallImage }}
+                      source={smallImage}
                       style={styles.smallCardImage}
                       resizeMode="cover"
                     />
