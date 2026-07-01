@@ -35,6 +35,8 @@ const avatars = [
   require('@/assets/images/avatars/lumina-avatar-fox.png'),
 ];
 
+console.log("TOTAL AVATARS:", avatars.length);
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -60,54 +62,47 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-
-      loadProfile();
-
+      console.log('FOCUS EFFECT DISPARADO');
+      loadProfile().then(() => {
+        console.log('LOAD PROFILE TERMINADO');
+      });
     }, [])
   );
 
   const loadProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
+
     if (session?.user?.id) {
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      console.log("SUPABASE ERROR:", error);
+
       if (profileData) {
-        if (profileData.avatar !== null) setSelectedAvatar(Number(profileData.avatar));
-        if (profileData.display_name) setDisplayName(profileData.display_name);
+        console.log("AVATAR BD:", profileData?.avatar);
+
+        if (profileData.avatar !== null) {
+          setSelectedAvatar(Number(profileData.avatar));
+        }
+        setDisplayName(profileData.display_name || '');
       }
     }
 
-    const avatar =
-      await AsyncStorage.getItem(
-        'lumina_avatar'
-      );
-
-    const savedName =
-      await AsyncStorage.getItem(
-        'lumina_display_name'
-      );
-
-    const savedPhoto =
-      await AsyncStorage.getItem(
-        'lumina_profile_photo'
-      );
-
-    if (avatar !== null) {
-
-      setSelectedAvatar(Number(avatar));
-
-    }
-
-    setDisplayName(savedName || '');
-
-    setProfilePhoto(savedPhoto || null);
-
-    const { data: { session } } = await supabase.auth.getSession();
     if (session?.user?.email) {
       setUserEmail(session.user.email);
-
     }
 
+    const savedPhoto = await AsyncStorage.getItem('lumina_profile_photo');
+    setProfilePhoto(savedPhoto || null);
+    console.log("PHOTO:", savedPhoto);
+    alert("LLEGO AQUI");
+    alert("selectedAvatar = " + selectedAvatar);
   }
+
+  alert("avatars.length = " + avatars.length);
+  alert("avatars[1] = " + JSON.stringify(avatars[1]));
 
   return (
     <LinearGradient
@@ -140,10 +135,10 @@ export default function ProfileScreen() {
                   style={styles.avatar}
                 />
 
-              ) : selectedAvatar !== null ? (
+              ) : (selectedAvatar !== null && selectedAvatar !== undefined && avatars[selectedAvatar]) ? (
 
                 <Image
-                  source={avatars[selectedAvatar]}
+                  source={avatars[1]}
                   style={styles.avatar}
                 />
 

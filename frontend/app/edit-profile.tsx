@@ -186,7 +186,7 @@ export default function EditProfileScreen() {
             return;
         }
 
-        await supabase
+        const { error } = await supabase
             .from('profiles')
             .update({
                 display_name: displayName,
@@ -198,6 +198,13 @@ export default function EditProfileScreen() {
                         : null,
             })
             .eq('id', session.user.id);
+        alert("SAVE ERROR: " + JSON.stringify(error));
+        console.log("SAVE ERROR:", error);
+
+        if (error) {
+            Alert.alert(error.message);
+            return;
+        }
 
         await AsyncStorage.setItem(
             'lumina_display_name',

@@ -138,7 +138,7 @@ export default function LoginScreen() {
 
   return (
     <ImageBackground
-      source={{ uri: BACKGROUND_IMAGE }}
+      source={BACKGROUND_IMAGE}
       style={styles.backgroundImage}
       resizeMode="cover"
     >

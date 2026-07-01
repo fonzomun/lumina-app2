@@ -92,6 +92,8 @@ export default function HomeScreen() {
       });
 
       console.log(response.data);
+      console.log("RESPUESTA API:", response.data);
+      console.log("TOTAL:", response.data.length);
 
       setCategories(response.data);
     } catch (error) {
@@ -113,11 +115,9 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-
+    console.log("HOME useEffect");
     fetchCategories();
-
     loadStreak();
-
   }, []);
 
   useEffect(() => {
@@ -214,6 +214,11 @@ export default function HomeScreen() {
   const largeCategories = categories.filter(c => c.priority === 1);
   const mediumCategories = categories.filter(c => c.priority === 2);
   const smallCategories = categories.filter(c => c.priority === 3);
+
+  console.log("CATEGORIES:", categories);
+  console.log("LARGE:", largeCategories.length);
+  console.log("MEDIUM:", mediumCategories.length);
+  console.log("SMALL:", smallCategories.length);
 
   const streakMessages = [
 
