@@ -20,14 +20,11 @@ import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  getMeditationStreak
-} from '@/lib/streaks';
+import { getMeditationStreak } from '@/lib/streaks';
 
 const BACKEND_URL = "https://lumina-app2.onrender.com";
 const { width } = Dimensions.get('window');
 
-// Official Lumina logo
 const LUMINA_LOGO_SMALL_COLOR = require('@/assets/images/lumina-assets/logo-small-color.png');
 const TAGLINE_IMAGE = require('@/assets/images/lumina-assets/tagline.png');
 const PROMO_BANNER_IMAGE = require('@/assets/images/lumina-assets/banner.png');
@@ -67,109 +64,68 @@ const avatars = [
 ];
 
 export default function HomeScreen() {
-  const [categories, setCategories] =
-    useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState('');
-
-  const [streak, setStreak] =
-    useState(0);
-
-  const [profilePhoto, setProfilePhoto] =
-    useState<string | null>(null);
-
-  const [selectedAvatar, setSelectedAvatar] =
-    useState<number | null>(null);
+  const [streak, setStreak] = useState(0);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null);
 
   const fetchCategories = async () => {
     try {
-      const token = await AsyncStorage.getItem('access_token');
-      const response = await axios.get(`${BACKEND_URL}/api/categories`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      console.log(response.data);
-      console.log("RESPUESTA API:", response.data);
-      console.log("TOTAL:", response.data.length);
-
+      const response = await axios.get(`${BACKEND_URL}/api/categories`);
+      console.log("CATEGORIAS:", JSON.stringify(response.data));
       setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
-    }
-    finally {
+      console.log('ERROR DETALLE:', JSON.stringify(error));
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
   const loadStreak = async () => {
-
-    const value =
-      await getMeditationStreak();
-
+    const value = await getMeditationStreak();
     setStreak(value);
+  };
 
+  const loadProfileData = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user?.id) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name, avatar')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profile?.display_name) {
+      setDisplayName(profile.display_name);
+    }
+
+    if (profile?.avatar !== null && profile?.avatar !== undefined) {
+      setSelectedAvatar(Number(profile.avatar));
+    }
+
+    const savedPhoto = await AsyncStorage.getItem('lumina_profile_photo');
+    if (savedPhoto) {
+      setProfilePhoto(savedPhoto);
+    }
   };
 
   useEffect(() => {
-    console.log("HOME useEffect");
     fetchCategories();
     loadStreak();
   }, []);
 
   useEffect(() => {
-
     loadProfileData();
-
   }, []);
-
-  const loadProfileData = async () => {
-
-    const { data: { session } } =
-      await supabase.auth.getSession();
-
-    if (!session?.user?.id) {
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', session.user.id)
-      .single();
-
-    if (profile?.display_name) {
-
-      setDisplayName(profile.display_name);
-
-    }
-
-    const savedPhoto =
-      await AsyncStorage.getItem(
-        'lumina_profile_photo'
-      );
-
-    const savedAvatar =
-      await AsyncStorage.getItem(
-        'lumina_avatar'
-      );
-
-    if (savedPhoto) {
-
-      setProfilePhoto(savedPhoto);
-
-    }
-
-    if (savedAvatar !== null) {
-
-      setSelectedAvatar(Number(savedAvatar));
-
-    }
-
-  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -201,7 +157,8 @@ export default function HomeScreen() {
   };
 
   const getSmallCardImage = (imageUrl: string | null): any => {
-    const catKey = imageUrl?.replace("cat_", ""); if (catKey && CATEGORY_IMAGES[catKey]) {
+    const catKey = imageUrl?.replace("cat_", "");
+    if (catKey && CATEGORY_IMAGES[catKey]) {
       return CATEGORY_IMAGES[catKey];
     }
     return null;
@@ -215,33 +172,16 @@ export default function HomeScreen() {
   const mediumCategories = categories.filter(c => c.priority === 2);
   const smallCategories = categories.filter(c => c.priority === 3);
 
-  console.log("CATEGORIES:", categories);
-  console.log("LARGE:", largeCategories.length);
-  console.log("MEDIUM:", mediumCategories.length);
-  console.log("SMALL:", smallCategories.length);
-
   const streakMessages = [
-
-    'Tu energía crece con constancia.',
-
-    'Cada día de calma transforma tu mente.',
-
-    'Pequeños momentos crean grandes cambios.',
-
-    'Tu paz interior también se fortalece.',
-
-    'Volver a ti también es progreso.',
-
+    'Tu energia crece con constancia.',
+    'Cada dia de calma transforma tu mente.',
+    'Pequenos momentos crean grandes cambios.',
+    'Tu paz interior tambien se fortalece.',
+    'Volver a ti tambien es progreso.',
   ];
 
-  const randomStreakMessage =
-
-    streakMessages[
-    streak % streakMessages.length
-    ];
-
-  const firstName =
-    displayName || user?.name || 'Viajero';
+  const randomStreakMessage = streakMessages[streak % streakMessages.length];
+  const firstName = displayName || user?.name || 'Viajero';
 
   if (loading) {
     return (
@@ -259,7 +199,6 @@ export default function HomeScreen() {
       colors={['#FFFFFF', '#FFF8F5', '#FFF5F0', '#FFF0F5', '#F5F0FF']}
       style={styles.container}
     >
-
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -269,65 +208,32 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {streak > 0 && (
-
             <View style={styles.streakCard}>
-
-              <Text style={styles.streakEmoji}>
-                🔥
-              </Text>
-
+              <Text style={styles.streakEmoji}>🔥</Text>
               <View>
-
-                <Text style={styles.streakTitle}>
-                  {streak} días seguidos
-                </Text>
-
-                <Text style={styles.streakSubtitle}>
-                  {randomStreakMessage}
-                </Text>
-
+                <Text style={styles.streakTitle}>{streak} dias seguidos</Text>
+                <Text style={styles.streakSubtitle}>{randomStreakMessage}</Text>
               </View>
-
             </View>
-
           )}
 
-          {/* Header */}
           <View style={styles.header}>
             <Image
               source={LUMINA_LOGO_SMALL_COLOR}
               style={styles.logoImage}
               resizeMode="contain"
             />
-
           </View>
 
-          {/* User Greeting */}
           <View style={styles.greetingContainer}>
             <View style={styles.avatarContainer}>
               {profilePhoto ? (
-
-                <Image
-                  source={{ uri: profilePhoto }}
-                  style={styles.avatar}
-                />
-
-              ) : selectedAvatar !== null ? (
-
-                <Image
-                  source={avatars[selectedAvatar]}
-                  style={styles.avatar}
-                />
-
+                <Image source={{ uri: profilePhoto }} style={styles.avatar} />
+              ) : (selectedAvatar !== null && avatars[selectedAvatar]) ? (
+                <Image source={avatars[selectedAvatar]} style={styles.avatar} />
               ) : user?.picture ? (
-
-                <Image
-                  source={{ uri: user.picture }}
-                  style={styles.avatar}
-                />
-
+                <Image source={{ uri: user.picture }} style={styles.avatar} />
               ) : (
-
                 <LinearGradient
                   colors={['#FF9A6C', '#FF6B8A']}
                   style={styles.avatarPlaceholder}
@@ -336,13 +242,11 @@ export default function HomeScreen() {
                     {firstName[0]?.toUpperCase()}
                   </Text>
                 </LinearGradient>
-
               )}
             </View>
             <Text style={styles.greeting}>Hola {displayName || firstName}</Text>
           </View>
 
-          {/* Tagline Image */}
           <View style={styles.taglineContainer}>
             <Image
               source={TAGLINE_IMAGE}
@@ -351,7 +255,6 @@ export default function HomeScreen() {
             />
           </View>
 
-          {/* Large Categories (Morning) */}
           {largeCategories.map((category) => (
             <TouchableOpacity
               key={category.id}
@@ -371,14 +274,13 @@ export default function HomeScreen() {
                 <View style={styles.cardContent}>
                   <Text style={styles.cardSubtitle}>MEDITACIONES PARA</Text>
                   <Text style={styles.cardTitle}>
-                    {category.name.includes('Mañana') ? 'LA MAÑANA' : category.name.toUpperCase()}
+                    {category.name.includes('Manana') ? 'LA MANANA' : category.name.toUpperCase()}
                   </Text>
                 </View>
               </View>
             </TouchableOpacity>
           ))}
 
-          {/* Medium Categories (Night) */}
           {mediumCategories.map((category) => (
             <TouchableOpacity
               key={category.id}
@@ -405,7 +307,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
 
-          {/* Small Categories Grid */}
           <View style={styles.smallCategoriesGrid}>
             {smallCategories.map((category) => {
               const smallImage = getSmallCardImage(category.image_url);
@@ -440,7 +341,6 @@ export default function HomeScreen() {
             })}
           </View>
 
-          {/* Promotional Banner */}
           <TouchableOpacity
             style={styles.promoBanner}
             onPress={handlePromoBannerPress}
@@ -459,12 +359,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
@@ -573,7 +469,6 @@ const styles = StyleSheet.create({
     height: 160,
     padding: 20,
     justifyContent: 'flex-end',
-    position: 'relative',
   },
   mediumCard: {
     borderRadius: 20,
@@ -598,7 +493,6 @@ const styles = StyleSheet.create({
     height: 120,
     padding: 16,
     justifyContent: 'flex-end',
-    position: 'relative',
   },
   cardOverlay: {
     flex: 1,
@@ -691,7 +585,6 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 20,
   },
-
   streakCard: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 20,
@@ -701,17 +594,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
-
   streakEmoji: {
     fontSize: 28,
   },
-
   streakTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1E3A5F',
   },
-
   streakSubtitle: {
     fontSize: 13,
     color: '#6B7280',

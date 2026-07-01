@@ -198,7 +198,6 @@ export default function EditProfileScreen() {
                         : null,
             })
             .eq('id', session.user.id);
-        alert("SAVE ERROR: " + JSON.stringify(error));
         console.log("SAVE ERROR:", error);
 
         if (error) {

@@ -156,7 +156,7 @@ export default function LoginScreen() {
             {/* Logo Image */}
             <View style={styles.logoContainer}>
               <Image
-                source={{ uri: LUMINA_LOGO_BIG_COLOR }}
+                source={LUMINA_LOGO_BIG_COLOR}
                 style={styles.logoImage}
                 resizeMode="contain"
               />

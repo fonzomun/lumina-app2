@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Image,
-  Alert,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +16,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 
-// Official Lumina logo
 const LUMINA_LOGO_SMALL_COLOR = 'https://customer-assets.emergentagent.com/job_positive-audio/artifacts/vo6dtgtz_Lumina-app_small-logo-color.png';
 
 const avatars = [
@@ -35,55 +33,41 @@ const avatars = [
   require('@/assets/images/avatars/lumina-avatar-fox.png'),
 ];
 
-console.log("TOTAL AVATARS:", avatars.length);
-
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [selectedAvatar, setSelectedAvatar] =
-    useState<number | null>(null);
-
-  const [displayName, setDisplayName] =
-    useState('');
-
+  const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null);
+  const [displayName, setDisplayName] = useState('');
   const [userEmail, setUserEmail] = useState('');
-
-  const [profilePhoto, setProfilePhoto] =
-    useState<string | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   const handleLogout = async () => {
-
-    console.log('LOGOUT PRESSED');
-
     await logout();
-
     router.replace('/login');
   };
 
   useFocusEffect(
     React.useCallback(() => {
-      console.log('FOCUS EFFECT DISPARADO');
-      loadProfile().then(() => {
-        console.log('LOAD PROFILE TERMINADO');
-      });
+      loadProfile();
     }, [])
   );
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
 
   const loadProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
 
     if (session?.user?.id) {
-      const { data: profileData, error } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
         .single();
-      console.log("SUPABASE ERROR:", error);
 
       if (profileData) {
-        console.log("AVATAR BD:", profileData?.avatar);
-
-        if (profileData.avatar !== null) {
+        if (profileData.avatar !== null && profileData.avatar !== undefined) {
           setSelectedAvatar(Number(profileData.avatar));
         }
         setDisplayName(profileData.display_name || '');
@@ -96,13 +80,9 @@ export default function ProfileScreen() {
 
     const savedPhoto = await AsyncStorage.getItem('lumina_profile_photo');
     setProfilePhoto(savedPhoto || null);
-    console.log("PHOTO:", savedPhoto);
-    alert("LLEGO AQUI");
-    alert("selectedAvatar = " + selectedAvatar);
-  }
+  };
 
-  alert("avatars.length = " + avatars.length);
-  alert("avatars[1] = " + JSON.stringify(avatars[1]));
+  console.log('selectedAvatar:', selectedAvatar, 'avatar:', avatars[selectedAvatar]);
 
   return (
     <LinearGradient
@@ -110,7 +90,6 @@ export default function ProfileScreen() {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
         <View style={styles.header}>
           <Image
             source={{ uri: LUMINA_LOGO_SMALL_COLOR }}
@@ -119,7 +98,6 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Profile Card */}
         <View style={styles.profileCard}>
           <LinearGradient
             colors={['#FF9A6C', '#FF6B8A', '#9B6BFF']}
@@ -129,96 +107,49 @@ export default function ProfileScreen() {
           >
             <View style={styles.avatarContainer}>
               {profilePhoto ? (
-
-                <Image
-                  source={{ uri: profilePhoto }}
-                  style={styles.avatar}
-                />
-
-              ) : (selectedAvatar !== null && selectedAvatar !== undefined && avatars[selectedAvatar]) ? (
-
-                <Image
-                  source={avatars[1]}
-                  style={styles.avatar}
-                />
-
+                <Image source={{ uri: profilePhoto }} style={styles.avatar} />
+              ) : (selectedAvatar !== null && avatars[selectedAvatar]) ? (
+                <Image source={avatars[selectedAvatar]} style={styles.avatar} />
               ) : user?.picture ? (
-
-                <Image
-                  source={{ uri: user.picture }}
-                  style={styles.avatar}
-                />
-
+                <Image source={{ uri: user.picture }} style={styles.avatar} />
               ) : (
-
                 <View style={styles.avatarPlaceholder}>
                   <Text style={styles.avatarText}>
                     {displayName[0]?.toUpperCase()}
                   </Text>
                 </View>
-
               )}
             </View>
-            <Text style={styles.userName}>
-              {displayName || 'Usuario'}
-            </Text>
+            <Text style={styles.userName}>{displayName || 'Usuario'}</Text>
             <Text style={styles.userEmail}>{userEmail}</Text>
           </LinearGradient>
 
           <View style={styles.menuContainer}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/edit-profile')}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/edit-profile')}>
               <View style={styles.menuIconContainer}>
-                <Ionicons
-                  name="person-outline"
-                  size={22}
-                  color="#7B61FF"
-                />
+                <Ionicons name="person-outline" size={22} color="#7B61FF" />
               </View>
               <Text style={styles.menuText}>Editar Perfil</Text>
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/notifications')}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications')}>
               <View style={styles.menuIconContainer}>
-                <Ionicons
-                  name="notifications-outline"
-                  size={22}
-                  color="#7B61FF"
-                />
+                <Ionicons name="notifications-outline" size={22} color="#7B61FF" />
               </View>
-
-              <Text style={styles.menuText}>
-                Notificaciones
-              </Text>
-
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color="#9CA3AF"
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/settings')}
-            >
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="settings-outline" size={22} color="#7B61FF" />
-              </View>
-              <Text style={styles.menuText}>Configuración</Text>
+              <Text style={styles.menuText}>Notificaciones</Text>
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/help-support')}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="settings-outline" size={22} color="#7B61FF" />
+              </View>
+              <Text style={styles.menuText}>Configuracion</Text>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help-support')}>
               <View style={styles.menuIconContainer}>
                 <Ionicons name="help-circle-outline" size={22} color="#7B61FF" />
               </View>
@@ -226,10 +157,7 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/about')}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/about')}>
               <View style={styles.menuIconContainer}>
                 <Ionicons name="information-circle-outline" size={22} color="#7B61FF" />
               </View>
@@ -241,23 +169,19 @@ export default function ProfileScreen() {
               <View style={[styles.menuIconContainer, styles.logoutIcon]}>
                 <Ionicons name="log-out-outline" size={22} color="#EF4444" />
               </View>
-              <Text style={styles.logoutText}>Cerrar Sesión</Text>
+              <Text style={styles.logoutText}>Cerrar Sesion</Text>
               <Ionicons name="chevron-forward" size={20} color="#EF4444" />
             </TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
-    </LinearGradient >
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
   header: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -296,11 +220,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     padding: 4,
     marginBottom: 16,
+    overflow: 'hidden',
   },
   avatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 40,
   },
   avatarPlaceholder: {
     width: '100%',
@@ -325,9 +249,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
   },
-  menuContainer: {
-    padding: 8,
-  },
+  menuContainer: { padding: 8 },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -356,9 +278,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
     paddingTop: 22,
   },
-  logoutIcon: {
-    backgroundColor: '#FEE2E2',
-  },
+  logoutIcon: { backgroundColor: '#FEE2E2' },
   logoutText: {
     flex: 1,
     fontSize: 16,
