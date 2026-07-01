@@ -94,3 +94,4 @@ credentials.json
 *.pem
 *.key
 .credentials
+frontend/.metro-cache/
